@@ -1,27 +1,50 @@
+@file:Suppress("SpellCheckingInspection")
+
 package com.example.pomodoro
 
+import android.annotation.SuppressLint
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.util.Locale
 
-@Suppress("SpellCheckingInspection")
 class MainActivity : AppCompatActivity() {
-    private lateinit var tempoText : TextView
-    private lateinit var inputMin : EditText
-    private lateinit var inputSeg : EditText
-    private lateinit var botaoIniciar : Button
-    private var contagemRegressiva : CountDownTimer ? = null
+    private lateinit var tela: View
+    private lateinit var interrupcoes: TextView
+    private lateinit var estadoText: TextView
+    private lateinit var tempoText: TextView
+    private lateinit var inputMin: EditText
+    private lateinit var inputSeg: EditText
+    private lateinit var botaoPrincipal: Button
+    private var contagemRegressiva: CountDownTimer? = null
+    private var tempoRestante: Long = 0
+    private var estaRodando = false
+    private var interrupcoesNum = 0
+    private var ciclosCompletos = 0
+    private var estadoAtual = Estado.Foco
+    private var aguardandoDescanso = false
+    private var pausadoDuranteDescanso = false
 
+    private enum class Estado {
+        Foco, DescansoCurto, DescansoLongo
+    }
+
+    private val tempoDescansoCurto = 5 * 60 * 1000L
+    private val tempoDescansoLongo = 15 * 60 * 1000L
+
+    @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -32,52 +55,130 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        tempoText = findViewById<TextView>(R.id.tempoText)
-        inputMin = findViewById<EditText>(R.id.inputMin)
-        inputSeg = findViewById<EditText>(R.id.inputSeg)
-        botaoIniciar = findViewById<Button>(R.id.botaoIniciar)
+        tela = findViewById(R.id.main)
+        estadoText = findViewById(R.id.estadoText)
+        tempoText = findViewById(R.id.tempoText)
+        inputMin = findViewById(R.id.inputMin)
+        inputSeg = findViewById(R.id.inputSeg)
+        botaoPrincipal = findViewById(R.id.botaoIniciar)
+        interrupcoes = findViewById(R.id.interrupcoes)
+        estadoText.visibility = View.INVISIBLE
 
-        botaoIniciar.setOnClickListener {
-            botaoIniciar.text = getString(R.string.botao_pausar)
-            inputMin.isEnabled = false
-            inputSeg.isEnabled = false
-
-            val tempoMin = inputMin.text.toString().toIntOrNull() ?:0
-            val tempoSeg = inputSeg.text.toString().toIntOrNull() ?:0
-
-            if (tempoMin > 0 || tempoSeg > 0) {
-                var tempoMilliS = tempoMin * 60 * 1000L //de minutos para milissegundos
-                tempoMilliS += tempoSeg * 1000L // soma os segundos para milissegundos
-                iniciarTemporizador(tempoMilliS)
+        botaoPrincipal.setOnClickListener {
+            when {
+                aguardandoDescanso -> iniciarDescanso()
+                estaRodando -> {
+                    interrupcoesNum++
+                    interrupcoes.text = "Interrupções totais: $interrupcoesNum"
+                    pausarTemporizador()
+                }
+                else -> {
+                    if (tempoRestante > 0) {
+                        retomarTemporizador()
+                    } else {
+                        iniciarFoco()
+                    }
+                }
             }
         }
     }
 
-    private fun iniciarTemporizador(tempoMillis : Long) {
+    private fun iniciarFoco() {
+        val minutos = inputMin.text.toString().toIntOrNull() ?: 0
+        val segundos = inputSeg.text.toString().toIntOrNull() ?: 0
+        val tempoFoco = (minutos * 60 + segundos) * 1000L
+
+        if (tempoFoco <= 0) {
+            Toast.makeText(this, "Digite um tempo válido!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        estadoAtual = Estado.Foco
+        pausadoDuranteDescanso = false
+        tela.setBackgroundColor(Color.parseColor("#FFB3B3"))
+        estadoText.text = getString(R.string.estado_foco)
+        iniciarTemporizador(tempoFoco)
+    }
+
+    private fun iniciarTemporizador(tempoMillis: Long) {
+        estadoText.visibility = View.VISIBLE
         contagemRegressiva?.cancel()
+
         contagemRegressiva = object : CountDownTimer(tempoMillis, 1000) {
-            override fun onTick(millisAteFim : Long) {
-                val minutos = millisAteFim / 60000  //millissegundos para minutos
-                val segundos = (millisAteFim % 60000) / 1000
-                val locale = Locale("en", "US")
-                tempoText.text = String.format(locale,"%02d:%02d", minutos, segundos)
+            override fun onTick(millisUntilFinished: Long) {
+                tempoRestante = millisUntilFinished
+                estaRodando = true
+                val minutos = millisUntilFinished / 60000
+                val segundos = (millisUntilFinished % 60000) / 1000
+                tempoText.text = String.format(Locale.US, "%02d:%02d", minutos, segundos)
             }
 
             override fun onFinish() {
-                botaoIniciar.text = getString(R.string.botao_iniciar)
-                tempoText.text = getString(R.string.tempo_zero)
+                tempoRestante = 0
+                estaRodando = false
                 iniciarVibracao()
+
+                if (estadoAtual == Estado.Foco) {
+                    prepararParaDescanso()
+                } else {
+                    finalizarDescanso()
+                }
             }
         }.start()
+
+        inputMin.isEnabled = false
+        inputSeg.isEnabled = false
+        botaoPrincipal.text = getString(R.string.botao_pausar)
     }
 
+    private fun retomarTemporizador() {
+        iniciarTemporizador(tempoRestante)
+    }
+
+    private fun pausarTemporizador() {
+        contagemRegressiva?.cancel()
+        estaRodando = false
+        pausadoDuranteDescanso = estadoAtual != Estado.Foco
+        botaoPrincipal.text = getString(R.string.botao_retomar)
+    }
+
+    @Suppress("DEPRECATION")
     private fun iniciarVibracao() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val vibrar = getSystemService(VIBRATOR_SERVICE) as Vibrator
-            val efeitoVibrar = VibrationEffect.createOneShot(1000, VibrationEffect.DEFAULT_AMPLITUDE)
-            vibrar.vibrate(efeitoVibrar)
-        } else {
-            TODO("VERSION.SDK_INT < O")
+            val vibrador = getSystemService(VIBRATOR_SERVICE) as Vibrator
+            vibrador.vibrate(VibrationEffect.createOneShot(1000, VibrationEffect.DEFAULT_AMPLITUDE))
         }
+    }
+
+    private fun prepararParaDescanso() {
+        aguardandoDescanso = true
+        botaoPrincipal.text = getString(R.string.botao_descansar)
+    }
+
+    private fun iniciarDescanso() {
+        aguardandoDescanso = false
+        ciclosCompletos++
+        val tempoDescanso = if (ciclosCompletos % 4 == 0) tempoDescansoLongo else tempoDescansoCurto
+
+        estadoAtual = if (ciclosCompletos % 4 == 0) Estado.DescansoLongo else Estado.DescansoCurto
+        tela.setBackgroundColor(if (estadoAtual == Estado.DescansoLongo) Color.parseColor("#B3FFB3") else Color.parseColor("#B3D9FF"))
+        estadoText.text = if (estadoAtual == Estado.DescansoLongo) getString(R.string.estado_DL) else getString(R.string.estado_DC)
+
+        iniciarTemporizador(tempoDescanso)
+        botaoPrincipal.text = getString(R.string.botao_pausar)
+    }
+
+    private fun finalizarDescanso() {
+        // Habilitar os campos de entrada
+        inputMin.isEnabled = true
+        inputSeg.isEnabled = true
+
+        // Resetar o botão para "Iniciar"
+        botaoPrincipal.text = getString(R.string.botao_iniciar)
+
+        // Resetar estado para permitir novo ciclo de foco
+        estadoAtual = Estado.Foco
+        tela.setBackgroundColor(Color.parseColor("#FFFFFF")) // Cor neutra
+        estadoText.visibility = View.INVISIBLE
     }
 }

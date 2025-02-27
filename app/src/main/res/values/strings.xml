@@ -3,8 +3,12 @@
     <string name="botao_iniciar">Iniciar</string>
     <string name="botao_pausar">Pausar</string>
     <string name="botao_retomar">Retomar</string>
+    <string name="botao_descansar">Descansar</string>
     <string name="tempo_zero">00:00</string>
     <string name="input_min">Minutos</string>
     <string name="input_seg">Segundos</string>
-    <string name="pausas">Interrupções:</string>
+    <string name="pausas">Interrupções totais:</string>
+    <string name="estado_foco">Foco</string>
+    <string name="estado_DC">Descanso Curto</string>
+    <string name="estado_DL">Descanso Longo</string>
 </resources>
