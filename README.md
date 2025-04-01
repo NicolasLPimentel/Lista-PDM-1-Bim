@@ -1,12 +1,15 @@
 # Lista-PDM-1-Bim
-Lista de exercícios de Programação para Dispositivos Móveis (PDM).
+Aplicativo de Pomodoro para gerenciamento de tempo.
 
 ## 📖 Descrição
-Este repositório contém uma série de exercícios focados no desenvolvimento mobile utilizando Kotlin e Gradle.
+Este projeto implementa um cronômetro baseado na técnica Pomodoro, utilizando Kotlin e Android SDK.  
+O usuário pode definir períodos de foco e descanso para melhorar a produtividade.
 
 ## 📝 Funcionalidades
-- Implementação de conceitos fundamentais do Android.
-- Configuração do projeto com Gradle.
-- Manipulação de elementos da UI e interação com usuários.
+- **Definição de tempo personalizado:** Permite que o usuário escolha a duração dos ciclos de foco e descanso.
+- **Contagem regressiva dinâmica:** Exibe o tempo restante em uma interface intuitiva.
+- **Modos de trabalho e descanso:** Alterna automaticamente entre períodos de foco e descanso curto ou longo.
+- **Registro de interrupções:** Contabiliza quantas vezes o usuário pausou a sessão de foco.
+- **Vibração ao término do ciclo:** Notifica o usuário quando um ciclo é concluído.
 
 ---
